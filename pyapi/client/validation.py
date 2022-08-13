@@ -1,0 +1,104 @@
+"""PyAPI API client."""
+from __future__ import annotations
+
+from string import Formatter
+from typing import Mapping, Optional
+from urllib.parse import parse_qs, urlencode, urljoin, urlsplit, urlunsplit
+
+from openapi_core.validation.request.datatypes import OpenAPIRequest, RequestParameters
+from openapi_core.validation.response.datatypes import OpenAPIResponse
+from requests import Response
+
+
+class ClientOpenAPIRequest(OpenAPIRequest):
+    """Client request."""
+
+    def __init__(self, host_url: str, op_spec):
+        self.spec = op_spec
+        self._url_parts = urlsplit(host_url)
+        self.mimetype = None
+
+        formatter = Formatter()
+        self.url_vars = [
+            var for _, var, _, _ in formatter.parse(op_spec.path) if var is not None
+        ]
+        self._path_pattern = self._url_parts.path + op_spec.path
+
+        self.full_url_pattern = urljoin(host_url, self._path_pattern)
+        self.method = op_spec.method.lower()
+        self.body: Mapping = {}
+        self.parameters = RequestParameters(
+            path={},
+            query=parse_qs(self._url_parts.query),
+            header={},
+            cookie={},
+        )
+        content = getattr(op_spec, "request_body", {}).get("content", {})
+        default_mimetipe = "application/json"
+        if content:
+            self.mimetype = (
+                default_mimetipe if default_mimetipe in content else list(content)[0]
+            )
+
+    @property
+    def url(self):
+        """Request URL."""
+        url_parts = self._url_parts._asdict()
+        url_parts["path"] = self._path_pattern.format(**self.parameters.path)
+        url_parts["query"] = urlencode(self.parameters.query)
+        return urlunsplit(tuple(url_parts.values()))
+
+    def prepare(
+        self,
+        *args,
+        body_: Optional[Mapping] = None,
+        headers_: Optional[Mapping] = None,
+        **kwargs,
+    ) -> ClientOpenAPIRequest:
+        """
+        Prepare request.
+
+        Arguments:
+            *args: Positional arguments are inserted into the URL.
+            body_: Optional request body.
+            headers_: Optional request headers.
+            **kwargs: The keyword arguments are converted to query arguments.
+        """
+        self._set_path_params(*args)
+        if headers_ is not None:
+            self.parameters.header.update(headers_)
+        self.parameters.query = kwargs
+        if body_ is not None:
+            self.body = body_
+        content_type_header = self.parameters.header.pop("content-type", None)
+        if content_type_header:
+            self.mimetype = content_type_header
+        return self
+
+    def _set_path_params(self, *args):
+        len_vars = len(self.url_vars)
+        if len(args) != len_vars:
+            error_message = f"Incorrect arguments: {self.spec.operation_id} accepts"
+            if len_vars:
+                error_message += (
+                    f" {len_vars} positional argument{'s' if len_vars > 1 else ''}:"
+                    f" {', '.join(self.url_vars)}"
+                )
+            else:
+                error_message += " no positional arguments"
+            raise RuntimeError(error_message)
+        self.parameters.path = dict(zip(self.url_vars, args))
+
+    @property
+    def headers(self):
+        """Request headers."""
+        return self.parameters.header
+
+
+def client_response_factory(response: Response) -> OpenAPIResponse:
+    """Create client response."""
+    return OpenAPIResponse(
+        data=response.content,
+        status_code=response.status_code,
+        mimetype=response.headers.get("content-type"),
+    )
