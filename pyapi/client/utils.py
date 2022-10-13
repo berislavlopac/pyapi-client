@@ -5,11 +5,13 @@ import json
 from enum import Enum
 from itertools import chain
 from pathlib import Path
-from typing import Callable, Dict, Union
+from typing import Callable, Dict, TYPE_CHECKING, Union
 
 import yaml
-from openapi_core.spec.paths import SpecPath
 from stringcase import camelcase
+
+if TYPE_CHECKING:  # pragma: no cover
+    from . import Spec
 
 
 class OperationSpec:
@@ -33,7 +35,7 @@ class OperationSpec:
         return super().__getattribute__(name)
 
     @classmethod
-    def get_all(cls, spec: dict) -> Dict[str, OperationSpec]:
+    def get_all(cls, spec: Spec) -> Dict[str, OperationSpec]:
         """Builds a dict of all operations in the spec."""
         return {
             op_spec["operationId"]: cls(path, method, op_spec)
@@ -49,7 +51,7 @@ class SpecFileTypes(tuple, Enum):
     YAML = ("yaml", "yml")
 
 
-def get_spec_from_file(path: Union[Path, str]) -> SpecPath:
+def get_spec_from_file(path: Union[Path, str]) -> dict:
     """Loads a local file and creates an OpenAPI `Spec` object."""
     path = Path(path)
     suffix = path.suffix[1:].lower()

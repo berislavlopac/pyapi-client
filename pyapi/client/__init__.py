@@ -1,18 +1,19 @@
 """PyAPI Client."""
+from functools import partial
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Callable, Optional, Protocol, Type, Union
+from typing import Any, MutableSequence, Optional, Protocol, Tuple, Type, Union
 
 import httpx
-from openapi_core import create_spec
-from openapi_core.shortcuts import ResponseValidator
-from openapi_core.spec.paths import SpecPath
-from openapi_core.validation.response.datatypes import OpenAPIResponse
+from openapi_core import Spec
+from openapi_core.validation.request import openapi_request_validator
+from openapi_core.validation.request.protocols import Request as RequestProtocol
+from openapi_core.validation.response import openapi_response_validator
+from openapi_core.validation.response.protocols import Response as ResponseProtocol
 from stringcase import snakecase
 
-from pyapi.utils import get_spec_from_file, OperationSpec
-
-from .validation import client_response_factory, ClientOpenAPIRequest
+from .utils import get_spec_from_file, OperationSpec
+from .validation import OpenAPIRequest, OpenAPIResponse, prepare_request_params
 
 
 class Requestable(Protocol):  # pragma: no cover
@@ -28,21 +29,22 @@ class Client:
 
     def __init__(
         self,
-        spec: Union[SpecPath, dict],
+        spec: Union[Spec, dict],
         *,
         server_url: Optional[str] = None,
-        client: Union[ModuleType, Requestable] = httpx,
-        request_class: Type[ClientOpenAPIRequest] = ClientOpenAPIRequest,
-        response_factory: Callable[[Any], OpenAPIResponse] = client_response_factory,
+        client: Optional[Requestable] = None,
+        request_class: Type[RequestProtocol] = OpenAPIRequest,
+        response_class: Type[ResponseProtocol] = OpenAPIResponse,
         headers: Optional[dict] = None,
     ):
-        if not isinstance(spec, SpecPath):
-            spec = create_spec(spec)
+        if isinstance(spec, dict):
+            spec = Spec.from_dict(spec)
         self.spec = spec
-        self.client = client
+        self.client = client or httpx.Client()
         self.request_class = request_class
-        self.response_factory = response_factory
+        self.response_class = response_class
         self.common_headers = headers or {}
+        self.request_history: MutableSequence[Tuple[RequestProtocol, ResponseProtocol]] = []
 
         if server_url is None:
             server_url = self.spec["servers"][0]["url"]
@@ -54,7 +56,7 @@ class Client:
             else:
                 self.spec["servers"].append({"url": server_url})
         self.server_url = server_url
-        self.validator = ResponseValidator(self.spec)
+        self.validate = partial(openapi_response_validator.validate, spec=self.spec)
 
         for operation_id, op_spec in OperationSpec.get_all(spec).items():
             setattr(
@@ -73,21 +75,17 @@ class Client:
             headers_: Optional[dict] = None,
             **kwargs,
         ):
-            request_headers = self.common_headers.copy()
-            request_headers.update(headers_ or {})
-            request = self.request_class(self.server_url, op_spec)
-            request.prepare(*args, body_=body_, headers_=request_headers, **kwargs)
-            request_params = {
-                "method": request.method,
-                "url": request.url,
-                "headers": request.headers,
-            }
-            if request.body:
-                request_params["json" if "json" in request.mimetype else "data"] = request.body
-            api_response = self.client.request(**request_params)
-            api_response.raise_for_status()
-            response = self.response_factory(api_response)
-            self.validator.validate(request, response).raise_for_errors()
+            headers = self.common_headers.copy()
+            headers.update(headers_ or {})
+            request_params = prepare_request_params(
+                self.server_url, op_spec, args, kwargs, body=body_, headers=headers
+            )
+            request = self.request_class.from_params(request_params)
+            openapi_request_validator.validate(self.spec, request).raise_for_errors()
+
+            response = request.send(self.client)
+            self.request_history.append((request, response))
+            openapi_response_validator.validate(self.spec, request, response).raise_for_errors()
             return response
 
         operation.__doc__ = op_spec.spec.get("summary") or op_spec.operation_id
@@ -100,3 +98,11 @@ class Client:
         """Creates an instance of the class by loading the spec from a local file."""
         spec = get_spec_from_file(path)
         return cls(spec, **kwargs)
+
+    @property
+    def latest(self) -> Optional[Tuple[RequestProtocol, ResponseProtocol]]:
+        """Returns the latest request/response pair.
+
+        Returns None if no requests were made successfully.
+        """
+        return self.request_history[-1] if self.request_history else None

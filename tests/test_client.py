@@ -1,40 +1,29 @@
 from http import HTTPStatus
 
 import pytest
-from openapi_core.validation.response.datatypes import OpenAPIResponse
+from openapi_core.validation.response.protocols import Response as ResponseProtocol
 from starlette.testclient import TestClient
 
 from pyapi.client import Client
-from pyapi.server import Application
+
+from .application import app
 
 
 def test_client_calls_endpoint(spec_dict, config):
-    app = Application(spec_dict, module=config.endpoint_base)
     client = Client(spec_dict, client=TestClient(app))
     response = client.dummy_test_endpoint()
-    assert isinstance(response, OpenAPIResponse)
-    assert response.data == b'{"foo":"bar"}'
+    assert isinstance(response, ResponseProtocol)
+    assert response.data == '{"foo":"bar"}'
 
 
 def test_client_calls_endpoint_with_body(spec_dict, config):
-    app = Application(spec_dict, module=config.endpoint_base)
     client = Client(spec_dict, client=TestClient(app))
     response = client.dummy_post_endpoint(body_={"foo": "bar"})
-    assert isinstance(response, OpenAPIResponse)
+    assert isinstance(response, ResponseProtocol)
     assert response.status_code == HTTPStatus.NO_CONTENT
 
 
-def test_client_calls_endpoint_using_server_with_path(spec_dict, config):
-    spec_dict["servers"].insert(0, {"url": "http://localhost:8001/with/path"})
-    app = Application(spec_dict, module=config.endpoint_base)
-    client = Client(spec_dict, client=TestClient(app))
-    response = client.dummy_test_endpoint()
-    assert isinstance(response, OpenAPIResponse)
-    assert response.data == b'{"foo":"bar"}'
-
-
 def test_client_calls_endpoint_with_custom_headers(spec_dict, config, monkeypatch):
-    app = Application(spec_dict, module=config.endpoint_base)
     client = Client(spec_dict, client=TestClient(app))
 
     def patch_request(request):
@@ -46,12 +35,12 @@ def test_client_calls_endpoint_with_custom_headers(spec_dict, config, monkeypatc
 
     monkeypatch.setattr(client.client, "request", patch_request(client.client.request))
     client.dummy_test_endpoint(headers_={"foo": "bar"})
-    headers = client.request_info["kwargs"]["headers"]
-    assert dict(headers) == {"foo": "bar"}
+
+    headers = dict(client.latest[0].request.headers)
+    assert all(item in headers.items() for item in {"foo": "bar"}.items())
 
 
 def test_client_incorrect_args_raises_error(spec_dict, config):
-    app = Application(spec_dict, module=config.endpoint_base)
     client = Client(spec_dict, client=TestClient(app))
     with pytest.raises(RuntimeError) as error:
         client.dummy_test_endpoint("foo")
@@ -62,7 +51,6 @@ def test_client_incorrect_args_raises_error(spec_dict, config):
 
 
 def test_client_too_few_args_raises_error(spec_dict, config):
-    app = Application(spec_dict, module=config.endpoint_base)
     client = Client(spec_dict, client=TestClient(app))
     with pytest.raises(RuntimeError) as error:
         client.dummy_test_endpoint_with_argument()
@@ -123,7 +111,8 @@ def test_endpoint_docstring_constructed_with_default_values(spec_dict):
 
 
 def test_common_headers_included_in_request(spec_dict, config, monkeypatch):
-    app = Application(spec_dict, module=config.endpoint_base)
+    from .application import app
+
     client = Client(spec_dict, client=TestClient(app), headers={"foo": "bar"})
 
     def patch_request(request):
@@ -135,5 +124,6 @@ def test_common_headers_included_in_request(spec_dict, config, monkeypatch):
 
     monkeypatch.setattr(client.client, "request", patch_request(client.client.request))
     client.dummy_test_endpoint(headers_={"baz": "bam"})
-    headers = client.request_info["kwargs"]["headers"]
-    assert dict(headers) == {"foo": "bar", "baz": "bam"}
+
+    headers = dict(client.latest[0].request.headers)
+    assert all(item in headers.items() for item in {"foo": "bar", "baz": "bam"}.items())
