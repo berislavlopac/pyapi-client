@@ -1,0 +1,74 @@
+version: v1.0
+name: Python checks and tests
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu2004
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+blocks:
+  - name: Code checks
+    skip:
+      when: "tag =~ '^([1-9][0-9]*!)?(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*))*((a|b|rc)(0|[1-9][0-9]*))?$'"
+    dependencies: []
+    task:
+      prologue:
+        commands:
+          - sem-version python 3.8
+          - python -m pip install -U pip pdm tox tox-pdm
+      jobs:
+        - name: checks
+          commands:
+            - python -m tox -e checks
+  - name: Unit tests
+    skip:
+      when: "tag =~ '^([1-9][0-9]*!)?(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*))*((a|b|rc)(0|[1-9][0-9]*))?$'"
+    dependencies:
+      - Code checks
+    task:
+      prologue:
+        commands:
+          - sem-version python $PY_VERSION
+          - python -m pip install -U pip pdm tox tox-pdm
+      jobs:
+        - name: tests
+          matrix:
+            - env_var: PY_VERSION
+              values:
+                - '3.8'
+                - '3.9'
+                - '3.10'
+          commands:
+            - 'PY_ENV=py"${PY_VERSION//.}"'
+            - python -m tox -e $PY_ENV
+      epilogue:
+        on_pass:
+          commands:
+            - 'test-results publish "test-reports/$PY_ENV-junit.xml"'
+  - name: Publish release
+    dependencies: []
+    run:
+      when: "tag =~ '^([1-9][0-9]*!)?(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*))*((a|b|rc)(0|[1-9][0-9]*))?$'"
+    task:
+      secrets:
+        - name: pypi-credentials
+      prologue:
+        commands:
+          - sem-version python 3.8
+          - python -m pip install -U pip pdm
+      jobs:
+        - name: Build and upload Python package
+          commands:
+            - pdm build
+            - pdm publish -u b11c -P $PYPI_PASSWORD
+after_pipeline:
+  task:
+    jobs:
+      - name: Publish Test Results
+        commands:
+          - test-results gen-pipeline-report
+promotions:
+  - name: Create new release
+    pipeline_file: create-release.yml

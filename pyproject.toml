@@ -1,13 +1,11 @@
 [project]
 name = "pyapi-client"
-version = "0.1.1"
+version = "0.2.0"
 description = "Python client library for OpenAPI-based services."
 readme = "README.md"
-authors = ["Berislav Lopac <berislav@lopac.net>"]
 license = {text = "MIT"}
-repository = "https://github.com/berislavlopac/pyapi-client"
-packages = [
-    { include = "pyapi/client/" },
+authors = [
+    {name = "Berislav Lopac", email = "berislav@lopac.net"},
 ]
 requires-python = ">=3.8,<4.0"
 dependencies = [
