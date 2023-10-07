@@ -1,27 +1,17 @@
 """PyAPI Client."""
-from functools import partial
+from __future__ import annotations
+
 from pathlib import Path
-from types import ModuleType
-from typing import Any, MutableSequence, Optional, Protocol, Tuple, Type, Union
+from typing import MutableSequence, Tuple, Type
 
 import httpx
-from openapi_core import Spec
-from openapi_core.validation.request import openapi_request_validator
-from openapi_core.validation.request.protocols import Request as RequestProtocol
-from openapi_core.validation.response import openapi_response_validator
-from openapi_core.validation.response.protocols import Response as ResponseProtocol
+from openapi_core import protocols, Spec, validate_request, validate_response
 from stringcase import snakecase
 
-from .utils import get_spec_from_file, OperationSpec
-from .validation import OpenAPIRequest, OpenAPIResponse, prepare_request_params
+from .spec import get_spec_from_file, OperationSpec
+from .wrappers import HttpxClient, HttpxRequest, HttpxResponse, Requestable
 
-
-class Requestable(Protocol):  # pragma: no cover
-    """Defines the `request` method compatible with the `requests` library."""
-
-    def request(self, method: str, url: str, **kwargs) -> Any:
-        """Construct and send a `Request`."""
-        ...
+HistoricRecord = Tuple[protocols.Request, protocols.Response]
 
 
 class Client:
@@ -29,13 +19,13 @@ class Client:
 
     def __init__(
         self,
-        spec: Union[Spec, dict],
+        spec: Spec | dict,
         *,
-        server_url: Optional[str] = None,
-        client: Optional[Requestable] = None,
-        request_class: Type[RequestProtocol] = OpenAPIRequest,
-        response_class: Type[ResponseProtocol] = OpenAPIResponse,
-        headers: Optional[dict] = None,
+        server_url: str = "",
+        client: Requestable | None = None,
+        request_class: Type[protocols.Request] = HttpxRequest,
+        response_class: Type[protocols.Response] = HttpxResponse,
+        headers: dict | None = None,
     ):
         if isinstance(spec, dict):
             spec = Spec.from_dict(spec)
@@ -44,9 +34,9 @@ class Client:
         self.request_class = request_class
         self.response_class = response_class
         self.common_headers = headers or {}
-        self.request_history: MutableSequence[Tuple[RequestProtocol, ResponseProtocol]] = []
+        self.request_history: MutableSequence[HistoricRecord] = []
 
-        if server_url is None:
+        if not server_url:
             server_url = self.spec["servers"][0]["url"]
         else:
             server_url = server_url.rstrip("/")
@@ -56,7 +46,6 @@ class Client:
             else:
                 self.spec["servers"].append({"url": server_url})
         self.server_url = server_url
-        self.validate = partial(openapi_response_validator.validate, spec=self.spec)
 
         for operation_id, op_spec in OperationSpec.get_all(spec).items():
             setattr(
@@ -71,22 +60,22 @@ class Client:
         def operation(
             self,
             *args,
-            body_: Optional[Union[dict, list]] = None,
-            headers_: Optional[dict] = None,
+            body_: dict | list | None = None,
+            headers_: dict | None = None,
             **kwargs,
-        ):
+        ) -> protocols.Response:
             headers = self.common_headers.copy()
             headers.update(headers_ or {})
-            request_params = prepare_request_params(
+            request = self.request_class.from_params(
                 self.server_url, op_spec, args, kwargs, body=body_, headers=headers
             )
-            request = self.request_class.from_params(request_params)
-            openapi_request_validator.validate(self.spec, request).raise_for_errors()
-
+            validate_request(request=request, spec=self.spec)
             response = request.send(self.client)
             self.request_history.append((request, response))
-            openapi_response_validator.validate(self.spec, request, response).raise_for_errors()
-            return response
+
+            validate_response(request=request, response=HttpxResponse(response), spec=self.spec)
+
+            return HttpxResponse(response)
 
         operation.__doc__ = op_spec.spec.get("summary") or op_spec.operation_id
         if description := op_spec.spec.get("description"):
@@ -94,13 +83,13 @@ class Client:
         return operation
 
     @classmethod
-    def from_file(cls, path: Union[Path, str], **kwargs):
+    def from_file(cls, path: Path | str, **kwargs):
         """Creates an instance of the class by loading the spec from a local file."""
-        spec = get_spec_from_file(path)
+        spec = get_spec_from_file(Path(path))
         return cls(spec, **kwargs)
 
     @property
-    def latest(self) -> Optional[Tuple[RequestProtocol, ResponseProtocol]]:
+    def latest(self) -> HistoricRecord | None:
         """Returns the latest request/response pair.
 
         Returns None if no requests were made successfully.

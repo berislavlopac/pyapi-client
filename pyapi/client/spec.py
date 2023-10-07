@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from enum import Enum
 from itertools import chain
 from pathlib import Path
-from typing import Callable, Dict, TYPE_CHECKING, Union
+from typing import Callable, Dict, Mapping, Sequence, TYPE_CHECKING
 
 import yaml
 from stringcase import camelcase
@@ -17,10 +18,18 @@ if TYPE_CHECKING:  # pragma: no cover
 class OperationSpec:
     """Utility class for defining API operations."""
 
-    def __init__(self, path: str, method: str, spec: dict):
+    def __init__(
+        self, path: str, method: str, spec: dict, parameters: Mapping | Sequence | None = None
+    ):
         self.path = path
         self.method = method
         self.spec = spec
+        self.parameters: dict = {}
+        if isinstance(parameters, Sequence):
+            self.parameters = defaultdict(dict)
+            for param in parameters:
+                self.parameters[param.pop("in")][param.pop("name")] = param
+            self.parameters = dict(self.parameters)
 
     def __getattr__(self, name):
         """
@@ -38,9 +47,15 @@ class OperationSpec:
     def get_all(cls, spec: Spec) -> Dict[str, OperationSpec]:
         """Builds a dict of all operations in the spec."""
         return {
-            op_spec["operationId"]: cls(path, method, op_spec)
+            op_spec["operationId"]: cls(
+                path,
+                method,
+                op_spec,
+                path_spec.get("parameters", []) + op_spec.get("parameters", []),
+            )
             for path, path_spec in spec["paths"].items()
             for method, op_spec in path_spec.items()
+            if "operationId" in op_spec
         }
 
 
@@ -51,9 +66,8 @@ class SpecFileTypes(tuple, Enum):
     YAML = ("yaml", "yml")
 
 
-def get_spec_from_file(path: Union[Path, str]) -> dict:
+def get_spec_from_file(path: Path) -> dict:
     """Loads a local file and creates an OpenAPI `Spec` object."""
-    path = Path(path)
     suffix = path.suffix[1:].lower()
 
     if suffix in SpecFileTypes.JSON:
@@ -66,5 +80,5 @@ def get_spec_from_file(path: Union[Path, str]) -> dict:
             f" Accepted types: {', '.join(chain(*SpecFileTypes))}"
         )
 
-    with open(path) as spec_file:
+    with open(path, encoding="utf-8") as spec_file:
         return spec_load(spec_file)

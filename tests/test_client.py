@@ -1,7 +1,7 @@
 from http import HTTPStatus
 
 import pytest
-from openapi_core.validation.response.protocols import Response as ResponseProtocol
+from openapi_core import protocols
 from starlette.testclient import TestClient
 
 from pyapi.client import Client
@@ -12,14 +12,14 @@ from .application import app
 def test_client_calls_endpoint(spec_dict, config):
     client = Client(spec_dict, client=TestClient(app))
     response = client.dummy_test_endpoint()
-    assert isinstance(response, ResponseProtocol)
+    assert isinstance(response, protocols.Response)
     assert response.data == '{"foo":"bar"}'
 
 
 def test_client_calls_endpoint_with_body(spec_dict, config):
     client = Client(spec_dict, client=TestClient(app))
     response = client.dummy_post_endpoint(body_={"foo": "bar"})
-    assert isinstance(response, ResponseProtocol)
+    assert isinstance(response, protocols.Response)
     assert response.status_code == HTTPStatus.NO_CONTENT
 
 
