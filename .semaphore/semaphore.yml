@@ -63,7 +63,7 @@ blocks:
         - name: Build and upload Python package
           commands:
             - pdm build
-            - pdm publish -u b11c -P $PYPI_PASSWORD
+            - pdm publish -u __token__ -P $PYPI_PASSWORD
 after_pipeline:
   task:
     jobs:
