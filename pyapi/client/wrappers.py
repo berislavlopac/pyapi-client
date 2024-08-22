@@ -1,8 +1,10 @@
 """OpenAPI request and response wrappers; adapted from openapi-core."""
+
 from __future__ import annotations
 
+from collections.abc import Mapping, MutableMapping, Sequence
 from string import Formatter
-from typing import Any, cast, Mapping, MutableMapping, Optional, Protocol, Sequence, Union
+from typing import Any, cast, Protocol
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 import httpx
@@ -30,7 +32,7 @@ class HttpxRequest(protocols.Request):
         self.request = request
         self.response: httpx.Response | None = None
         if request.url is None:
-            raise RuntimeError("Request URL is missing")
+            raise RuntimeError("Request URL is missing")  # noqa: TRY003
 
         cookie = {}
         cookie.update(self.request.headers.get("cookie", {}))
@@ -50,7 +52,6 @@ class HttpxRequest(protocols.Request):
     @property
     def path(self) -> str:
         """Return the request path."""
-        assert isinstance(self.request.url.path, str)
         return self.request.url.path
 
     @property
@@ -60,12 +61,12 @@ class HttpxRequest(protocols.Request):
         return method and method.lower() or ""
 
     @property
-    def body(self) -> Optional[str]:
+    def body(self) -> bytes | None:
         """Return the request body as string, if present."""
-        return self.request.content.decode("utf-8")
+        return self.request.content
 
     @property
-    def mimetype(self) -> str:
+    def content_type(self) -> str:
         """Return the request content type."""
         # Order matters because all python requests issued from a session
         # include Accept */* which does not necessarily match the content type
@@ -92,10 +93,10 @@ class HttpxRequest(protocols.Request):
         cls,
         host_url: str,
         op_spec: OperationSpec,
-        path_params: Optional[Sequence[str]] = None,
-        query_params: Optional[Mapping] = None,
-        body: Optional[Union[dict, list]] = None,
-        headers: Optional[Mapping] = None,
+        path_params: Sequence[str] | None = None,
+        query_params: Mapping | None = None,
+        body: dict | list | None = None,
+        headers: Mapping | None = None,
     ) -> HttpxRequest:
         """
         Creates a new request from individual parameters.
@@ -140,7 +141,7 @@ class HttpxRequest(protocols.Request):
         content_type_header = headers.get("content-type", None)
 
         params = RequestParameters(
-            path=dict(zip(url_vars, path_params)),
+            path=dict(zip(url_vars, path_params, strict=True)),
             query=query_params or {},
             header=headers or {},
             cookie={},
@@ -149,7 +150,7 @@ class HttpxRequest(protocols.Request):
         mimetype = "application/json"
         content = getattr(op_spec, "request_body", {}).get("content", {})
         if content and mimetype not in content:
-            mimetype = list(content)[0]
+            mimetype = next(iter(content))
         if content_type_header:
             mimetype = content_type_header
 
@@ -176,9 +177,9 @@ class HttpxResponse(protocols.Response):
         self.response = response
 
     @property
-    def data(self) -> str:
+    def data(self) -> bytes | None:
         """Return the response content as string."""
-        return self.response.text
+        return self.response.content
 
     @property
     def status_code(self) -> int:
@@ -186,7 +187,7 @@ class HttpxResponse(protocols.Response):
         return self.response.status_code
 
     @property
-    def mimetype(self) -> str:
+    def content_type(self) -> str:
         """Return the response content type."""
         return self.response.headers.get("content-type", "")
 

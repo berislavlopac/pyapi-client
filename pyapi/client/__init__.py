@@ -1,17 +1,20 @@
 """PyAPI Client."""
+
 from __future__ import annotations
 
+from collections.abc import MutableSequence
+from json import JSONDecodeError
 from pathlib import Path
-from typing import MutableSequence, Tuple, Type
 
 import httpx
-from openapi_core import protocols, Spec, validate_request, validate_response
+from jsonschema_path import SchemaPath
+from openapi_core import protocols, validate_request, validate_response
 from stringcase import snakecase
 
-from .spec import get_spec_from_file, OperationSpec
+from .spec import load_spec, OperationSpec, SpecFormat, UnknownSpecFormatError
 from .wrappers import HttpxClient, HttpxRequest, HttpxResponse, Requestable
 
-HistoricRecord = Tuple[protocols.Request, protocols.Response]
+HistoricRecord = tuple[protocols.Request, protocols.Response]
 
 
 class Client:
@@ -19,17 +22,18 @@ class Client:
 
     def __init__(
         self,
-        spec: Spec | dict,
+        spec: SchemaPath | dict,
         *,
         server_url: str = "",
         client: Requestable | None = None,
-        request_class: Type[protocols.Request] = HttpxRequest,
-        response_class: Type[protocols.Response] = HttpxResponse,
+        request_class: type[protocols.Request] = HttpxRequest,
+        response_class: type[protocols.Response] = HttpxResponse,
         headers: dict | None = None,
     ):
         if isinstance(spec, dict):
-            spec = Spec.from_dict(spec)
-        self.spec = spec
+            self.spec = SchemaPath.from_dict(spec)
+        else:
+            self.spec = spec
         self.client = client or httpx.Client()
         self.request_class = request_class
         self.response_class = response_class
@@ -47,7 +51,7 @@ class Client:
                 self.spec["servers"].append({"url": server_url})
         self.server_url = server_url
 
-        for operation_id, op_spec in OperationSpec.get_all(spec).items():
+        for operation_id, op_spec in OperationSpec.get_all(self.spec).items():
             setattr(
                 self,
                 snakecase(operation_id),
@@ -85,7 +89,30 @@ class Client:
     @classmethod
     def from_file(cls, path: Path | str, **kwargs):
         """Creates an instance of the class by loading the spec from a local file."""
-        spec = get_spec_from_file(Path(path))
+        path = Path(path)
+        suffix = path.suffix[1:].lower()
+
+        for spec_format in SpecFormat:
+            if suffix in spec_format:
+                break
+        else:
+            raise UnknownSpecFormatError()
+        source = path.read_text(encoding="utf-8")
+
+        spec = load_spec(source, spec_format)
+        return cls(spec, **kwargs)
+
+    @classmethod
+    def from_url(cls, url: str, **kwargs):
+        """Creates an instance of the class by loading the spec from a URL."""
+        response = httpx.get(url)
+        try:
+            raw_spec = response.json()
+            spec_format = SpecFormat.JSON
+        except JSONDecodeError:
+            raw_spec = response.text
+            spec_format = SpecFormat.YAML
+        spec = load_spec(raw_spec, spec_format)
         return cls(spec, **kwargs)
 
     @property

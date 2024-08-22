@@ -13,7 +13,7 @@ def test_client_calls_endpoint(spec_dict, config):
     client = Client(spec_dict, client=TestClient(app))
     response = client.dummy_test_endpoint()
     assert isinstance(response, protocols.Response)
-    assert response.data == '{"foo":"bar"}'
+    assert response.data == b'{"foo":"bar"}'
 
 
 def test_client_calls_endpoint_with_body(spec_dict, config):
@@ -84,16 +84,16 @@ def test_incorrect_endpoint_raises_error(spec_dict):
 
 
 @pytest.mark.parametrize("filename", ("openapi.json", "openapi.yaml"))
-def test_from_file(config, filename):
+def test_spec_loads_from_file(config, filename):
     file_path = config.test_dir / filename
     client = Client.from_file(file_path)
 
     assert client.spec["info"]["title"] == "Test Spec"
 
 
-def test_from_file_raises_exception_if_unknown_type(config):
+def test_loading_from_file_raises_exception_if_unknown_type(config):
     file_path = config.test_dir / "openapi.unknown"
-    with pytest.raises(RuntimeError):
+    with pytest.raises(TypeError):
         Client.from_file(file_path)
 
 

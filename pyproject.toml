@@ -7,12 +7,13 @@ license = {text = "MIT"}
 authors = [
     {name = "Berislav Lopac", email = "berislav@lopac.net"},
 ]
-requires-python = ">=3.8,<4.0"
+requires-python = ">=3.10"
 dependencies = [
     "PyYAML>=5.4",
     "stringcase>=1.2.0",
     "openapi-core>=0.16.1",
-    "httpx>=0.22"
+    "httpx>=0.22",
+    "jsonschema-path>=0.3.3",
 ]
 
 [project.urls]
@@ -51,20 +52,48 @@ docs = [
     "mkdocs-material>=8.5.6",
 ]
 
-[tool.pdm.scripts]
-tests.cmd = "pytest --spec --cov"
-check-lint.shell = """
-    ruff .
-    black --check .
+[tool.pdm.scripts.tests]
+cmd = "pytest --spec --cov"
+help = "Run unit tests and coverage."
+
+[tool.pdm.scripts.tests-quick]
+cmd = "pytest -m 'not api_request'"
+help = "Run unit tests without coverage and API request tests."
+
+[tool.pdm.scripts.check-lint]
+shell = """
+    ruff format --check .
     isort --check .
+    ruff check .
 """
-check-typing.cmd = "mypy --install-types --non-interactive pyapi/"
-check-docs.cmd = "pydocstyle pyapi/"
-checks.composite = ["check-lint", "check-typing", "check-docs"]
-new-commits.shell = "git log $(git describe --tags --abbrev=0)..HEAD --oneline --no-decorate"
+help = "Run linting and formating checks."
+
+[tool.pdm.scripts.check-typing]
+cmd = "mypy --install-types --non-interactive"
+help = "Run static typing analysis."
+
+[tool.pdm.scripts.checks]
+composite = ["check-lint", "check-typing"]
+help = "Run all checks."
+
+[tool.pdm.scripts.ready]
+composite = ["check-lint", "check-typing", "tests"]
+help = "Run all checks and tests."
+
+[tool.pdm.scripts.reformat]
+shell = """
+    isort .
+    ruff format .
+"""
+help = "Reformat the code using isort and ruff."
+
+[tool.pdm.scripts.new-commits]
+shell = "git log $(git describe --tags --abbrev=0)..HEAD --oneline --no-decorate"
+help = "List commit messages since the last release tag."
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
 source = [ "pyapi/", ]
@@ -76,31 +105,49 @@ show_missing = true
 fail_under = 90
 exclude_lines = [ "pragma: no cover", "@abstract",]
 
-[tool.black]
-line-length = 96
-target-version = ['py38', 'py39', 'py310', 'py311']
-verbose = false
-skip-string-normalization = false
-
 [tool.isort]
 profile = "black"
 line_length = 96
 filter_files = true
 force_alphabetical_sort_within_sections = true
 
-[tool.ruff]
-line-length = 96
-target-version = "py38"
-output-format = "grouped"
-
-[tool.ruff.per-file-ignores]
-"__init__.py" = ["F401"]
-
-[tool.pydocstyle]
-add-ignore = "D104, D107, D212, D401"
-convention = "google"
-match-dir = "^(?!tests|examples).*"
-
 [tool.mypy]
 mypy_path = "pyapi/"
+files = ["pyapi/"]
 ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 96
+target-version = "py310"
+output-format = "grouped"
+
+[tool.ruff.lint]
+select = [  # see https://docs.astral.sh/ruff/rules/
+    "E4", "E7", "E9",  # basic pycodestyle rules
+    "W",     # pycodestyle warnings
+    "F",     # Pyflakes rules
+    "N",     # PEP8 naming conventions
+    "PLR",   # Pylint refactoring recommendations
+    "PTH",   # recommends to use pathlib instead of os.path
+    "UP",    # pyupgrade suggestions
+    "ANN",   # absence of annotations
+    "ASYNC",
+    "BLE",   # locates blind exception capture
+    "FBT",
+    "B",     # locates possible bugs and design problems
+    "A",     # locates shadowing of builtin names
+    "C4",    # locates possible issues with comprehensions
+    "DTZ",   # locates incorrect use of timezone information
+    "PIE",   # miscellaneous linting rules
+    "TRY",   # locates potential exception handling antipatterns
+    "PERF",  # locates potential performance issues
+    "RUF",   # various Ruff-specific linting rules
+]
+ignore = ["ANN", "D105", "D107", "D203", "D212", "D401", "D407", "D413"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["D", "N", "PLR", "DTZ001", "ANN", "S101"]
+
+[tool.ruff.lint.pylint]
+max-args = 6

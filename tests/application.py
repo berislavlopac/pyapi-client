@@ -6,7 +6,7 @@ from pyapi.server import Application
 from starlette.responses import Response
 
 file_path = Path(__file__).parent / "openapi.json"
-with open(file_path) as spec_file:
+with file_path.open() as spec_file:
     spec_dict = json.load(spec_file)
 
 app = Application(spec_dict)
@@ -34,5 +34,4 @@ async def dummy_post_endpoint(request):
     return Response(status_code=HTTPStatus.NO_CONTENT.value)
 
 
-async def endpoint_returning_nothing(request):
-    ...
+async def endpoint_returning_nothing(request): ...
