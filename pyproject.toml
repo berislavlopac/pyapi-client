@@ -1,6 +1,6 @@
 [project]
 name = "pyapi-client"
-version = "0.3.0"
+version = "0.3.1"
 description = "Python client library for making requests to any OpenAPI-based service."
 readme = "README.md"
 license = {text = "MIT"}
