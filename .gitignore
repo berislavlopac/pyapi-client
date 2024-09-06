@@ -184,3 +184,6 @@ tmp/
 
 # kube manifest
 helm/baked_manifest.yaml
+
+# PDM files
+.pdm-python
