@@ -14,5 +14,5 @@
 from pyapi.client import Client
 
 client = Client.from_file("path/to/openapi.yaml")
-result = client.some_endpoint_id("path", "variables", "query_var"="example")
+result = client.some_endpoint_id("path", "variables", query_var="example")
 ```
