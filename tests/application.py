@@ -1,38 +1,34 @@
 import json
 from http import HTTPStatus
-from pathlib import Path
 
-from starlette.responses import Response
-
-from pyapi.server import Application
-
-file_path = Path(__file__).parent / "openapi.json"
-with file_path.open() as spec_file:
-    spec_dict = json.load(spec_file)
-
-app = Application(spec_dict)
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Route
 
 
-@app.endpoint
-def dummy_test_endpoint(request):
-    return {"foo": "bar"}
+async def dummy_test_endpoint(request):
+    return JSONResponse({"foo": "bar"})
 
 
-@app.endpoint
-def dummy_test_endpoint_with_argument(request):
-    return {"foo": request.path_params["test_arg"]}
+async def dummy_test_endpoint_with_argument(request):
+    return JSONResponse({"foo": request.path_params["test_arg"]})
 
 
-@app.endpoint
 async def dummy_test_endpoint_coro(request):
-    return {"baz": 123}
+    return JSONResponse({"baz": 123})
 
 
-@app.endpoint
 async def dummy_post_endpoint(request):
     body = await request.body()
     assert json.loads(body.decode()) == {"foo": "bar"}
     return Response(status_code=HTTPStatus.NO_CONTENT.value)
 
 
-async def endpoint_returning_nothing(request): ...
+app = Starlette(
+    routes=[
+        Route("/test", dummy_test_endpoint, methods=["GET"]),
+        Route("/test", dummy_post_endpoint, methods=["POST"]),
+        Route("/test/{test_arg}", dummy_test_endpoint_with_argument, methods=["GET"]),
+        Route("/test-async", dummy_test_endpoint_coro, methods=["GET"]),
+    ]
+)

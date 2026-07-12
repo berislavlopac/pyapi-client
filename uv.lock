@@ -1069,7 +1069,6 @@ dev = [
     { name = "isort" },
     { name = "mypy" },
     { name = "pip" },
-    { name = "pyapi-server" },
     { name = "pydocstyle" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1078,6 +1077,7 @@ dev = [
     { name = "pytest-spec" },
     { name = "requests" },
     { name = "ruff" },
+    { name = "starlette" },
     { name = "toml" },
     { name = "tox" },
     { name = "tox-uv" },
@@ -1103,7 +1103,6 @@ dev = [
     { name = "isort", specifier = ">=5.10.1" },
     { name = "mypy", specifier = ">=0.942" },
     { name = "pip", specifier = ">=25.3" },
-    { name = "pyapi-server", specifier = ">=0.3.4" },
     { name = "pydocstyle", specifier = ">=6.1.1" },
     { name = "pytest", specifier = ">=7.1.1" },
     { name = "pytest-asyncio", specifier = ">=0.18.3" },
@@ -1112,6 +1111,7 @@ dev = [
     { name = "pytest-spec", specifier = ">=3.2.0" },
     { name = "requests", specifier = ">=2.27.1" },
     { name = "ruff", specifier = ">=0.0.253" },
+    { name = "starlette", specifier = ">=1.3.1" },
     { name = "toml", specifier = ">=0.10.2" },
     { name = "tox", specifier = ">=4.56.4" },
     { name = "tox-uv", specifier = ">=1.35.2" },
@@ -1120,22 +1120,6 @@ dev = [
 docs = [
     { name = "mkdocs", specifier = ">=1.3.0" },
     { name = "mkdocs-material", specifier = ">=8.5.6" },
-]
-
-[[package]]
-name = "pyapi-server"
-version = "0.9.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "jsonschema-path" },
-    { name = "openapi-core" },
-    { name = "pyyaml" },
-    { name = "starlette" },
-    { name = "stringcase" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/19/43/c6d7add7c5691f5745d813784a183c5b4536e15131ef6e6442782db800c2/pyapi_server-0.9.0.tar.gz", hash = "sha256:d053def5ab9786ec32193ecabcbfdd67c6a1504fca816b8ba95da7fe974b4546", size = 9800, upload-time = "2024-11-18T13:40:37.721Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1f/d9/144fafd1f126fcc7b769bbc0d7e57d20dff8d718ecca162995f1f21c2461/pyapi_server-0.9.0-py3-none-any.whl", hash = "sha256:6fdadafeba2619e67023ed7679cb21dc978305b1eb4feb1f36a43e225777a6d2", size = 6921, upload-time = "2024-11-18T13:40:36.325Z" },
 ]
 
 [[package]]
