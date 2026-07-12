@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
-
-# from collections.abc import Mapping, Sequence
 from enum import Enum
 from itertools import chain
 
@@ -15,11 +13,21 @@ from jsonschema_path import SchemaPath
 from stringcase import camelcase
 
 
+def _parameters(spec: SchemaPath) -> list:
+    """Returns the raw list of parameters from a spec section, or an empty list."""
+    parameters: SchemaPath | list = spec.get("parameters", [])
+    return parameters.read_value() if isinstance(parameters, SchemaPath) else parameters
+
+
 class OperationSpec:
     """Utility class for defining API operations."""
 
     def __init__(
-        self, path: str, method: str, spec: dict, parameters: Mapping | Sequence | None = None
+        self,
+        path: str,
+        method: str,
+        spec: SchemaPath | dict,
+        parameters: Mapping | Sequence | None = None,
     ):
         self.path = path
         self.method = method
@@ -47,11 +55,11 @@ class OperationSpec:
     def get_all(cls, spec: SchemaPath) -> dict[str, OperationSpec]:
         """Builds a dict of all operations in the spec."""
         return {
-            op_spec["operationId"]: cls(
-                path,
-                method,
+            str(op_spec["operationId"]): cls(
+                str(path),
+                str(method),
                 op_spec,
-                path_spec.get("parameters", []) + op_spec.get("parameters", []),
+                _parameters(path_spec) + _parameters(op_spec),
             )
             for path, path_spec in spec["paths"].items()
             for method, op_spec in path_spec.items()
@@ -67,15 +75,17 @@ class SpecFormat(tuple, Enum):
 
 
 class UnknownSpecFormatError(TypeError):
+    """Error when the format spec is unknown."""
+
     def __init__(self):
         message = (
-            "Unknown specification format."
-            f" Accepted formats: {', '.join(chain(*SpecFormat))}"
+            f"Unknown specification format. Accepted formats: {', '.join(chain(*SpecFormat))}"
         )
         super().__init__(message)
 
 
 def load_spec(raw_spec: str, spec_format: SpecFormat) -> dict:
+    """Loads the raw spec based on the format."""
     if spec_format == SpecFormat.JSON:
         load: Callable = json.loads
     else:

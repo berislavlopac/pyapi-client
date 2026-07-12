@@ -11,7 +11,7 @@ from jsonschema_path import SchemaPath
 from openapi_core import protocols, validate_request, validate_response
 from stringcase import snakecase
 
-from .spec import load_spec, OperationSpec, SpecFormat, UnknownSpecFormatError
+from .spec import OperationSpec, SpecFormat, UnknownSpecFormatError, load_spec
 from .wrappers import HttpxClient, HttpxRequest, HttpxResponse, Requestable
 
 HistoricRecord = tuple[protocols.Request, protocols.Response]
@@ -41,14 +41,14 @@ class Client:
         self.request_history: MutableSequence[HistoricRecord] = []
 
         if not server_url:
-            server_url = self.spec["servers"][0]["url"]
+            server_url = str(self.spec["servers"][0]["url"])
         else:
             server_url = server_url.rstrip("/")
             for server in self.spec["servers"]:
                 if server_url == server["url"]:
                     break
             else:
-                self.spec["servers"].append({"url": server_url})
+                self.spec["servers"].read_value().append({"url": server_url})
         self.server_url = server_url
 
         for operation_id, op_spec in OperationSpec.get_all(self.spec).items():
@@ -83,7 +83,7 @@ class Client:
 
         operation.__doc__ = op_spec.spec.get("summary") or op_spec.operation_id
         if description := op_spec.spec.get("description"):
-            operation.__doc__ = f"{ operation.__doc__ }\n\n{ description }"
+            operation.__doc__ = f"{operation.__doc__}\n\n{description}"
         return operation
 
     @classmethod
@@ -117,7 +117,8 @@ class Client:
 
     @property
     def latest(self) -> HistoricRecord | None:
-        """Returns the latest request/response pair.
+        """
+        Returns the latest request/response pair.
 
         Returns None if no requests were made successfully.
         """

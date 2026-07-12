@@ -16,7 +16,7 @@ def spec_dict(config):
 class Config:
     def __init__(self):
         self.test_dir = Path(__file__).parent
-        # self.endpoint_base = "tests.endpoints"
+        self.endpoint_base = "tests.endpoints"
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ def config():
 @pytest.fixture  # (autouse=True, scope="function")
 def app():
     app_process = subprocess.Popen(
-        [
+        [  # noqa: S607
             "uvicorn",
             "tests.application:app",
             "--host",

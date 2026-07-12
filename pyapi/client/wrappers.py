@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, MutableMapping, Sequence
 from string import Formatter
-from typing import Any, cast, Protocol
+from typing import Any, Protocol, cast
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 import httpx
@@ -58,7 +58,7 @@ class HttpxRequest(protocols.Request):
     def method(self) -> str:
         """Return the request HTTP method."""
         method = self.request.method
-        return method and method.lower() or ""
+        return (method and method.lower()) or ""
 
     @property
     def body(self) -> bytes | None:

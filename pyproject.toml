@@ -7,6 +7,21 @@ license = {text = "MIT"}
 authors = [
     {name = "Berislav Lopac", email = "berislav@lopac.net"},
 ]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
+]
+
 requires-python = ">=3.10"
 dependencies = [
     "PyYAML>=5.4",
@@ -15,6 +30,30 @@ dependencies = [
     "httpx>=0.22",
     "jsonschema-path>=0.3.3",
 ]
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=0.18.3",
+    "pytest-cov>=3.0.0",
+    "pytest-mypy>=0.9.1",
+    "requests>=2.27.1",
+    "pytest>=7.1.1",
+    "black>=22.1.0",
+    "pydocstyle>=6.1.1",
+    "mypy>=0.942",
+    "toml>=0.10.2",
+    "pytest-spec>=3.2.0",
+    "tox-pdm>=0.6.1",
+    "isort>=5.10.1",
+    "ruff>=0.0.253",
+    "pyapi-server>=0.3.4",
+    "pip>=25.3",
+    "tox[tox-uv]>=4.34.1",
+    "types-pyyaml>=6.0.12.20250915",
+]
+docs = [
+    "mkdocs>=1.3.0",
+    "mkdocs-material>=8.5.6",
+]
 
 [project.urls]
 homepage = "https://pyapi-client.readthedocs.io"
@@ -22,74 +61,15 @@ documentation = "https://pyapi-client.readthedocs.io"
 repository = "https://github.com/berislavlopac/pyapi-client"
 
 [build-system]
-requires = ["pdm-pep517>=1.0.0"]
-build-backend = "pdm.pep517.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.pdm.build]
-includes = ["pyapi/client/"]
+[tool.hatch.build]
+packages = ["pyapi"]
 
-[tool.pdm.dev-dependencies]
-dev = [
-    "pytest-asyncio>=0.18.3",
-    "pytest-cov>=3.0.0",
-    "pytest-flake8>=1.1.1",
-    "pytest-mypy>=0.9.1",
-    "requests>=2.27.1",
-    "pytest>=7.1.1",
-    "black>=22.1.0",
-    "pydocstyle>=6.1.1",
-    "mypy>=0.942",
-    "tox>=3.24.5",
-    "toml>=0.10.2",
-    "pytest-spec>=3.2.0",
-    "tox-pdm>=0.6.1",
-    "isort>=5.10.1",
-    "ruff>=0.0.253",
-    "pyapi-server>=0.3.4",
-]
-docs = [
-    "mkdocs>=1.3.0",
-    "mkdocs-material>=8.5.6",
-]
-
-[tool.pdm.scripts.tests]
-cmd = "pytest --spec --cov"
-help = "Run unit tests and coverage."
-
-[tool.pdm.scripts.tests-quick]
-cmd = "pytest -m 'not api_request'"
-help = "Run unit tests without coverage and API request tests."
-
-[tool.pdm.scripts.check-lint]
-shell = """
-    ruff format --check .
-    isort --check .
-    ruff check .
-"""
-help = "Run linting and formating checks."
-
-[tool.pdm.scripts.check-typing]
-cmd = "mypy --install-types --non-interactive"
-help = "Run static typing analysis."
-
-[tool.pdm.scripts.checks]
-composite = ["check-lint", "check-typing"]
-help = "Run all checks."
-
-[tool.pdm.scripts.ready]
-composite = ["check-lint", "check-typing", "tests"]
-help = "Run all checks and tests."
-
-[tool.pdm.scripts.reformat]
-shell = """
-    isort .
-    ruff format .
-"""
-help = "Reformat the code using isort and ruff."
-
-[tool.pdm.scripts.new-commits]
-shell = "git log $(git describe --tags --abbrev=0)..HEAD --oneline --no-decorate"
-help = "List commit messages since the last release tag."
+[tool.uv]
+package = true
+default-groups = ["dev"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -112,40 +92,69 @@ filter_files = true
 force_alphabetical_sort_within_sections = true
 
 [tool.mypy]
-mypy_path = "pyapi/"
 files = ["pyapi/"]
 ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 96
-target-version = "py310"
 output-format = "grouped"
 
 [tool.ruff.lint]
 select = [  # see https://docs.astral.sh/ruff/rules/
     "E4", "E7", "E9",  # basic pycodestyle rules
-    "W",     # pycodestyle warnings
-    "F",     # Pyflakes rules
-    "N",     # PEP8 naming conventions
-    "PLR",   # Pylint refactoring recommendations
-    "PTH",   # recommends to use pathlib instead of os.path
-    "UP",    # pyupgrade suggestions
-    "ANN",   # absence of annotations
-    "BLE",   # locates blind exception capture
-    "B",     # locates possible bugs and design problems
-    "A",     # locates shadowing of builtin names
-    "C4",    # locates possible issues with comprehensions
-    "DTZ",   # locates incorrect use of timezone information
-    "PIE",   # miscellaneous linting rules
-    "TRY",   # locates potential exception handling antipatterns
-    "PERF",  # locates potential performance issues
-    "RUF",   # various Ruff-specific linting rules
+    "W",        # pycodestyle warnings
+    "F",        # Pyflakes rules
+    "D",        # pydocstyle checks
+    "N",        # PEP8 naming conventions
+    "W",        # pycodestyle warnings
+    "C90",      # McCabe complexity
+    "N",        # PEP8 naming conventions
+    "I",        # import statements linting and formatting
+    "PLR",      # Pylint refactoring recommendations
+    "PTH",      # recommends to use pathlib instead of os.path
+    "UP",       # pyupgrade suggestions
+    "BLE",      # locates blind exception capture
+    "B",        # locates possible bugs and design problems
+    "A",        # locates shadowing of builtin names
+    "C4",       # locates possible issues with comprehensions
+    "DTZ",      # locates incorrect use of timezone information
+    "PIE",      # miscellaneous linting rules
+    "TRY",      # locates potential exception handling antipatterns
+    "PERF",     # locates potential performance issues
+    "RUF",      # various Ruff-specific linting rules
+    "S",        # various insecure code, with bandit
+    "ERA",      # eradicate: commented-out code
 ]
-ignore = ["ANN", "D105", "D107", "D203", "D212", "D401", "D407", "D413"]
+ignore = [
+    "ANN",
+    "D105",
+    "D107",
+    "D203",
+    "D212",
+    "D401",
+    "D407",
+    "D413"
+]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"tests/*" = ["D", "N", "PLR", "DTZ001", "ANN", "S101"]
+"tests/*" = [
+    "D",
+    "N",
+    "PLR",
+    "DTZ001",
+    "ANN",
+    "S101",
+    "S104"
+]
+"example/*" = [
+    "D",        # skip pydocstyle checks
+    "S101",
+]
+
+[tool.ruff.lint.isort]
+# see https://docs.astral.sh/ruff/settings/#lintisort
+known-first-party = ["pyapi"]
 
 [tool.ruff.lint.pylint]
 max-args = 6

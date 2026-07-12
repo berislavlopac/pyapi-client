@@ -45,8 +45,7 @@ def test_client_incorrect_args_raises_error(spec_dict, config):
     with pytest.raises(RuntimeError) as error:
         client.dummy_test_endpoint("foo")
     assert error.exconly() == (
-        "RuntimeError: Incorrect arguments: dummyTestEndpoint"
-        " accepts no positional arguments"
+        "RuntimeError: Incorrect arguments: dummyTestEndpoint accepts no positional arguments"
     )
 
 

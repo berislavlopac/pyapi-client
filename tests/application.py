@@ -2,8 +2,9 @@ import json
 from http import HTTPStatus
 from pathlib import Path
 
-from pyapi.server import Application
 from starlette.responses import Response
+
+from pyapi.server import Application
 
 file_path = Path(__file__).parent / "openapi.json"
 with file_path.open() as spec_file:
