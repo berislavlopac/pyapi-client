@@ -42,7 +42,6 @@ dev = [
     "mypy>=0.942",
     "toml>=0.10.2",
     "pytest-spec>=3.2.0",
-    "tox-pdm>=0.6.1",
     "isort>=5.10.1",
     "ruff>=0.0.253",
     "pyapi-server>=0.3.4",
