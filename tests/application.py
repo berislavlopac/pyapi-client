@@ -24,11 +24,18 @@ async def dummy_post_endpoint(request):
     return Response(status_code=HTTPStatus.NO_CONTENT.value)
 
 
+async def dummy_form_endpoint(request):
+    body = await request.body()
+    assert body == b"foo=bar"
+    return Response(status_code=HTTPStatus.NO_CONTENT.value)
+
+
 app = Starlette(
     routes=[
         Route("/test", dummy_test_endpoint, methods=["GET"]),
         Route("/test", dummy_post_endpoint, methods=["POST"]),
         Route("/test/{test_arg}", dummy_test_endpoint_with_argument, methods=["GET"]),
         Route("/test-async", dummy_test_endpoint_coro, methods=["GET"]),
+        Route("/form", dummy_form_endpoint, methods=["POST"]),
     ]
 )

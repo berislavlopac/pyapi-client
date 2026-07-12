@@ -1,6 +1,10 @@
+import json
 from http import HTTPStatus
+from json import JSONDecodeError
 
+import httpx
 import pytest
+from jsonschema_path import SchemaPath
 from openapi_core import protocols
 from starlette.testclient import TestClient
 
@@ -82,11 +86,13 @@ def test_incorrect_endpoint_raises_error(spec_dict):
         client.foo_bar()
 
 
-@pytest.mark.parametrize("filename", ("openapi.json", "openapi.yaml"))
-def test_spec_loads_from_file(config, filename):
-    file_path = config.test_dir / filename
-    client = Client.from_file(file_path)
+def test_spec_loads_from_json_file(config):
+    client = Client.from_file(config.test_dir / "openapi.json")
+    assert client.spec["info"]["title"] == "Test Spec"
 
+
+def test_spec_loads_from_yaml_file(yaml_spec_file):
+    client = Client.from_file(yaml_spec_file)
     assert client.spec["info"]["title"] == "Test Spec"
 
 
@@ -126,3 +132,64 @@ def test_common_headers_included_in_request(spec_dict, config, monkeypatch):
 
     headers = dict(client.latest[0].request.headers)
     assert all(item in headers.items() for item in {"foo": "bar", "baz": "bam"}.items())
+
+
+def test_client_calls_endpoint_with_path_argument(spec_dict, config):
+    client = Client(spec_dict, client=TestClient(app))
+    response = client.dummy_test_endpoint_with_argument("xyz")
+    assert isinstance(response, protocols.Response)
+    assert response.data == b'{"foo":"xyz"}'
+
+
+def test_client_calls_async_endpoint(spec_dict, config):
+    client = Client(spec_dict, client=TestClient(app))
+    response = client.dummy_test_endpoint_coro()
+    assert response.data == b'{"baz":123}'
+
+
+def test_client_passes_query_parameters(spec_dict, config):
+    client = Client(spec_dict, client=TestClient(app))
+    client.dummy_test_endpoint(q="hello")
+    sent_request = client.latest[0].request
+    assert sent_request.url.params["q"] == "hello"
+
+
+def test_client_sends_form_encoded_body(spec_dict, config):
+    client = Client(spec_dict, client=TestClient(app))
+    response = client.dummy_form_endpoint(body_={"foo": "bar"})
+    assert response.status_code == HTTPStatus.NO_CONTENT
+
+
+def test_client_accepts_schemapath_spec(spec_dict):
+    client = Client(SchemaPath.from_dict(spec_dict))
+    assert client.server_url == spec_dict["servers"][0]["url"]
+
+
+def test_client_loads_spec_from_url_json(spec_dict, monkeypatch):
+    class FakeResponse:
+        def json(self):
+            return spec_dict
+
+        @property
+        def text(self):
+            return json.dumps(spec_dict)
+
+    monkeypatch.setattr(httpx, "get", lambda url: FakeResponse())
+    client = Client.from_url("http://example.com/openapi.json")
+    assert client.spec["info"]["title"] == "Test Spec"
+
+
+def test_client_loads_spec_from_url_yaml(yaml_spec_file, monkeypatch):
+    yaml_text = yaml_spec_file.read_text()
+
+    class FakeResponse:
+        def json(self):
+            raise JSONDecodeError("not json", yaml_text, 0)
+
+        @property
+        def text(self):
+            return yaml_text
+
+    monkeypatch.setattr(httpx, "get", lambda url: FakeResponse())
+    client = Client.from_url("http://example.com/openapi.yaml")
+    assert client.spec["info"]["title"] == "Test Spec"

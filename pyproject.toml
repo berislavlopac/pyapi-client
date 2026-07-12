@@ -145,7 +145,8 @@ ignore = [
     "DTZ001",
     "ANN",
     "S101",
-    "S104"
+    "S104",
+    "TRY003"
 ]
 "example/*" = [
     "D",        # skip pydocstyle checks
