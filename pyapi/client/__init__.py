@@ -106,11 +106,11 @@ class Client:
     def from_url(cls, url: str, **kwargs):
         """Creates an instance of the class by loading the spec from a URL."""
         response = httpx.get(url)
+        raw_spec = response.text
         try:
-            raw_spec = response.json()
+            response.json()
             spec_format = SpecFormat.JSON
         except JSONDecodeError:
-            raw_spec = response.text
             spec_format = SpecFormat.YAML
         spec = load_spec(raw_spec, spec_format)
         return cls(spec, **kwargs)
